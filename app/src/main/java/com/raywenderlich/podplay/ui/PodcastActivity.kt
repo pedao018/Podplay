@@ -8,6 +8,7 @@ import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
+import android.widget.Toast
 import androidx.activity.viewModels
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.widget.SearchView
@@ -15,6 +16,7 @@ import androidx.appcompat.widget.Toolbar
 import androidx.lifecycle.viewModelScope
 import androidx.recyclerview.widget.DividerItemDecoration
 import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.work.*
 import com.raywenderlich.podplay.adapter.PodcastListAdapter
 import com.raywenderlich.podplay.R
 import com.raywenderlich.podplay.databinding.ActivityPodcastBinding
@@ -24,10 +26,12 @@ import com.raywenderlich.podplay.repository.PodcastRepo
 import com.raywenderlich.podplay.service.ItunesService
 import com.raywenderlich.podplay.service.RssFeedService
 import com.raywenderlich.podplay.viewmodel.SearchViewModel
+import com.raywenderlich.podplay.worker.EpisodeUpdateWorker
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.concurrent.TimeUnit
 
 class PodcastActivity : AppCompatActivity(), PodcastListAdapter.PodcastListAdapterListener,
     PodcastDetailsFragment.OnPodcastDetailsListener {
@@ -48,6 +52,9 @@ class PodcastActivity : AppCompatActivity(), PodcastListAdapter.PodcastListAdapt
     companion object {
         val TAG = javaClass.simpleName
         private const val TAG_DETAILS_FRAGMENT = "DetailsFragment"
+        private const val TAG_EPISODE_UPDATE_JOB =
+            "com.raywenderlich.podplay.episodes"
+
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -59,10 +66,13 @@ class PodcastActivity : AppCompatActivity(), PodcastListAdapter.PodcastListAdapt
         updateControls()
         setupPodcastListView()
         //createSubscription()
+
         //This gets the saved Intent and passes it to the existing handleIntent() method
         //For not to lost data when rotate screen
         handleIntent(intent)
+
         addBackStackListener()
+        scheduleJobs()
     }
 
     private fun setupToolbar() {
@@ -89,6 +99,11 @@ class PodcastActivity : AppCompatActivity(), PodcastListAdapter.PodcastListAdapt
 
         podcastListAdapter = PodcastListAdapter(null, this, this)
         databinding.podcastRecyclerView.adapter = podcastListAdapter
+
+        databinding.testNotifyBtn.setOnClickListener {
+            Toast.makeText(this, "Click", Toast.LENGTH_SHORT).show()
+            podcastViewModel.deleteEpisodeForTestNotify()
+        }
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
@@ -140,6 +155,14 @@ class PodcastActivity : AppCompatActivity(), PodcastListAdapter.PodcastListAdapt
             val query = intent.getStringExtra(SearchManager.QUERY) ?: return
             performSearch(query)
         }
+        val podcastFeedUrl = intent.getStringExtra(EpisodeUpdateWorker.EXTRA_FEED_URL)
+        if (podcastFeedUrl != null) {
+            podcastViewModel.viewModelScope.launch {
+                val podcastSummaryViewData = podcastViewModel.setActivePodcast(podcastFeedUrl)
+                podcastSummaryViewData?.let { podcastSummaryView -> onShowDetails(podcastSummaryView) }
+            }
+        }
+
     }
 
     private fun performSearch(term: String) {
@@ -256,6 +279,25 @@ class PodcastActivity : AppCompatActivity(), PodcastListAdapter.PodcastListAdapt
             databinding.toolbar.title = getString(R.string.subscribed_podcasts)
             podcastListAdapter.setSearchData(podcasts)
         }
+    }
+
+    private fun scheduleJobs() {
+        // 1
+        val constraints: Constraints = Constraints.Builder().apply {
+            setRequiredNetworkType(NetworkType.CONNECTED)
+            setRequiresCharging(true)
+        }.build()
+        // 2
+        val request = PeriodicWorkRequestBuilder<EpisodeUpdateWorker>(
+            1, TimeUnit.HOURS
+        )
+            .setConstraints(constraints)
+            .build()
+        // 3
+        WorkManager.getInstance(this).enqueueUniquePeriodicWork(
+            TAG_EPISODE_UPDATE_JOB,
+            ExistingPeriodicWorkPolicy.REPLACE, request
+        )
     }
 
 

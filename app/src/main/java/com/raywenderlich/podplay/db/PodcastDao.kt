@@ -50,4 +50,21 @@ interface PodcastDao {
     @Delete
     fun deletePodcast(podcast: Podcast)
 
+    @Query("SELECT * FROM Podcast ORDER BY FeedTitle")
+    fun loadPodcastsStatic(): List<Podcast>
+
+
+    @Query(
+        """
+            DELETE FROM Episode WHERE guid IN
+            (
+                SELECT * FROM (SELECT guid FROM Episode WHERE PodCastID IN (SELECT ID FROM Podcast WHERE feedUrl IN ('https://androidcentral.libsyn.com/rss')) LIMIT 5) as a
+                UNION
+                SELECT * FROM (SELECT guid FROM Episode WHERE PodCastID IN (SELECT ID FROM Podcast WHERE feedUrl IN ('https://www.raywenderlich.com/feed/podcast')) LIMIT 5) as b
+            )
+            """
+    )
+    suspend fun deleteEpisodeForTestNotify()
+
+
 }

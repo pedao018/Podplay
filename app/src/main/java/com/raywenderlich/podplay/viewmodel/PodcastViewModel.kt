@@ -131,5 +131,22 @@ class PodcastViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    suspend fun setActivePodcast(feedUrl: String): SearchViewModel.PodcastSummaryViewData? {
+        val repo = podcastRepo ?: return null
+        val podcast = repo.getPodcast(feedUrl)
+        if (podcast == null) {
+            return null
+        } else {
+            _podcastLiveData.value = podcastToPodcastView(podcast)
+            activePodcast = podcast
+            return podcastToSummaryView(podcast)
+        }
+    }
+
+
+    fun deleteEpisodeForTestNotify() {
+        val repo = podcastRepo ?: return
+        repo.deleteEpisodeForTestNotify()
+    }
 
 }
