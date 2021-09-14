@@ -1,5 +1,6 @@
 package com.raywenderlich.podplay.ui
 
+import android.content.Context
 import android.os.Bundle
 import android.text.method.ScrollingMovementMethod
 import android.view.*
@@ -11,12 +12,12 @@ import com.bumptech.glide.Glide
 import com.raywenderlich.podplay.R
 import com.raywenderlich.podplay.adapter.EpisodeListAdapter
 import com.raywenderlich.podplay.databinding.FragmentPodcastDetailsBinding
-import com.raywenderlich.podplay.model.PodcastViewModel
+import com.raywenderlich.podplay.viewmodel.PodcastViewModel
 
 class PodcastDetailsFragment : Fragment() {
     private lateinit var databinding: FragmentPodcastDetailsBinding
     private lateinit var episodeListAdapter: EpisodeListAdapter
-
+    private var listener: OnPodcastDetailsListener? = null
 
     /*
     activitytViewModels() is an extension function that allows the fragment to access and share view models from the fragment’s parent activity.
@@ -77,6 +78,8 @@ class PodcastDetailsFragment : Fragment() {
                 // 3
                 episodeListAdapter = EpisodeListAdapter(viewData.episodes)
                 databinding.episodeRecyclerView.adapter = episodeListAdapter
+
+                activity?.invalidateOptionsMenu()
             }
         })
     }
@@ -85,6 +88,52 @@ class PodcastDetailsFragment : Fragment() {
     override fun onCreateOptionsMenu(menu: Menu, inflater: MenuInflater) {
         super.onCreateOptionsMenu(menu, inflater)
         inflater.inflate(R.menu.menu_details, menu)
+    }
+
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        return when (item.itemId) {
+            R.id.menu_feed_action -> {
+                if (item.title == getString(R.string.unsubscribe)) {
+                    listener?.onUnsubscribe()
+                } else {
+                    listener?.onSubscribe()
+                }
+                true
+            }
+            else ->
+                super.onOptionsItemSelected(item)
+        }
+    }
+
+
+    override fun onPrepareOptionsMenu(menu: Menu) {
+        podcastViewModel.podcastLiveData.observe(viewLifecycleOwner, { podcast ->
+            if (podcast != null) {
+                menu.findItem(R.id.menu_feed_action).title = if (podcast.subscribed)
+                    getString(R.string.unsubscribe) else getString(R.string.subscribe)
+            }
+        })
+
+        super.onPrepareOptionsMenu(menu)
+    }
+
+
+    /*
+    The property holds a reference to the listener. onAttach() is called by the FragmentManager when the fragment is attached to its parent activity.
+    The context argument is a reference to the parent Activity.
+    If the Activity implements the OnPodcastDetailsListener interface, then you assign the listener property to it.
+    If it doesn’t implement the interface, then an exception is thrown.
+    * */
+    override fun onAttach(context: Context) {
+        super.onAttach(context)
+        if (context is OnPodcastDetailsListener) {
+            listener = context
+        } else {
+            throw RuntimeException(
+                context.toString() +
+                        " must implement OnPodcastDetailsListener"
+            )
+        }
     }
 
     private fun updateControls() {
@@ -96,4 +145,10 @@ class PodcastDetailsFragment : Fragment() {
         }
     }
 
+    interface OnPodcastDetailsListener {
+        fun onSubscribe()
+        fun onUnsubscribe()
+    }
+
 }
+

@@ -5,7 +5,7 @@ import android.view.ViewGroup
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import com.raywenderlich.podplay.databinding.EpisodeItemBinding
-import com.raywenderlich.podplay.model.PodcastViewModel
+import com.raywenderlich.podplay.viewmodel.PodcastViewModel
 import com.raywenderlich.podplay.ui.HtmlUtils
 import com.raywenderlich.podplay.util.DateUtils
 
